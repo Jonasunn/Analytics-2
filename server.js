@@ -95,7 +95,7 @@ function sanitizeShort(s, max=80){ if (s === null || s === undefined) return nul
 const PIXEL_GIF = Buffer.from("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==", "base64");
 
 app.get("/healthz", (_req,res)=>res.json({ok:true}));
-app.get("/api/version", (_req,res)=>res.json({ version: "views-dedupe-10s-v1" }));
+app.get("/api/version", (_req,res)=>res.json({ version: "views-dedupe-10s-v2-clicks" }));
 
 app.post("/api/sessions/start", (_req,res) => {
   const sid = Math.random().toString(16).slice(2) + Date.now().toString(16);
@@ -255,17 +255,18 @@ app.get("/api/stats", (req,res) => {
   }
 
   const byDay = new Map();
-  const totals = { starts: 0, wins: 0, regs: 0, views: 0 };
+  const totals = { starts: 0, wins: 0, regs: 0, views: 0, clicks: 0 };
 
   const viewSeen = new Set();
 
   for (const r of ev) {
     const k = dayKey(r.client_ts);
-    if (!byDay.has(k)) byDay.set(k, { date: k, starts: 0, wins: 0, regs: 0, views: 0 });
+    if (!byDay.has(k)) byDay.set(k, { date: k, starts: 0, wins: 0, regs: 0, views: 0, clicks: 0 });
     const o = byDay.get(k);
 
     if (r.event_name === "game_start" || r.event_name === "card_draw") { o.starts++; totals.starts++; }
     if (r.event_name === "win" || r.event_name === "popout_click") { o.wins++; totals.wins++; }
+    if (r.event_name === "banner_click") { o.clicks++; totals.clicks++; }
     if (r.event_name === "banner_view" || r.event_name === "page_view") {
       // Dedupe views that fire twice for a single impression (common in ad/CDN iframes)
       let url = "";
@@ -281,7 +282,7 @@ app.get("/api/stats", (req,res) => {
   }
   for (const r of regs) {
     const k = dayKey(r.created_at);
-    if (!byDay.has(k)) byDay.set(k, { date: k, starts: 0, wins: 0, regs: 0, views: 0 });
+    if (!byDay.has(k)) byDay.set(k, { date: k, starts: 0, wins: 0, regs: 0, views: 0, clicks: 0 });
     byDay.get(k).regs++;
     totals.regs++;
   }
@@ -290,7 +291,7 @@ app.get("/api/stats", (req,res) => {
   for (let i = days-1; i >= 0; i--) {
     const d = new Date(Date.now() - i*24*3600*1000);
     const k = dayKey(d.toISOString());
-    series.push(byDay.get(k) || { date: k, starts: 0, wins: 0, regs: 0, views: 0 });
+    series.push(byDay.get(k) || { date: k, starts: 0, wins: 0, regs: 0, views: 0, clicks: 0 });
   }
 
   const rates = {
